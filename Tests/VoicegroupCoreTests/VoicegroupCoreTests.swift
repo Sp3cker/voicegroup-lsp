@@ -2,6 +2,26 @@ import Testing
 import Foundation
 @testable import VoicegroupCore
 
+@Test func languageServiceCompletesMacroNamesAtLineStart() throws {
+    let service = VoicegroupLanguageService(workspace: WorkspaceIndex())
+    let completions = service.completions(text: "\tvoice_dir", line: 0, character: 10)
+
+    #expect(completions.contains { $0.label == "voice_directsound" })
+    #expect(completions.contains { $0.label == "voice_directsound_no_resample" })
+}
+
+@Test func languageServiceReturnsHoverForMacroArguments() throws {
+    let service = VoicegroupLanguageService(workspace: WorkspaceIndex())
+    let hover = service.hover(
+        text: "\tvoice_directsound 60, 0, DirectSoundWaveData_piano, 255, 0, 255, 127",
+        line: 0,
+        character: 20
+    )
+
+    #expect(hover?.contains("base_midi_key") == true)
+    #expect(hover?.contains("DirectSound") == true)
+}
+
 @Test func macroCatalogUsesPoryaaaaVoiceMacroRules() throws {
     #expect(MacroCatalog.byName["voice_directsound_no_resample"]?.arguments.count == 7)
     #expect(MacroCatalog.byName["voice_square_1"]?.arguments.map(\.name) == [

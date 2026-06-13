@@ -11,6 +11,7 @@ public enum LanguageServerMain {
 /// the LSP methods needed for first use and keeps state in memory because VS
 /// Code sends full document text for open files.
 final class StdioLanguageServer {
+    //TODO: does this need to be var? The path can change but...
     private var workspace = WorkspaceIndex()
     private var documents: [String: String] = [:]
 
@@ -76,33 +77,23 @@ final class StdioLanguageServer {
     private func completionResult(from message: [String: Any]) -> [[String: Any]] {
         guard let (uri, line, character) = documentPosition(from: message),
               let text = documents[uri] else { return [] }
-        return LanguageService(workspace: workspace)
-            .completions(text: text, line: line, character: character)
-            .map { ["label": $0.label, "detail": $0.detail, "kind": 3] }
+        return LspLanguageServiceAdapter(workspace: workspace)
+            .completionResult(text: text, line: line, character: character)
     }
 
     private func hoverResult(from message: [String: Any]) -> [String: Any]? {
         guard let (uri, line, character) = documentPosition(from: message),
-              let text = documents[uri],
-              let hover = LanguageService(workspace: workspace).hover(text: text, line: line, character: character) else {
+              let text = documents[uri] else {
             return nil
         }
-        return ["contents": ["kind": "markdown", "value": hover]]
+        return LspLanguageServiceAdapter(workspace: workspace)
+            .hoverResult(text: text, line: line, character: character)
     }
 
     private func publishDiagnostics(uri: String, text: String) {
-        let diagnostics = LanguageService(workspace: workspace).diagnostics(text: text, uri: uri)
-        notify(method: "textDocument/publishDiagnostics", params: [
-            "uri": uri,
-            "diagnostics": diagnostics.map { diagnostic in
-                [
-                    "range": lspRange(diagnostic.range),
-                    "severity": diagnostic.severity.rawValue,
-                    "code": diagnostic.code,
-                    "message": diagnostic.message
-                ]
-            }
-        ])
+        let params = LspLanguageServiceAdapter(workspace: workspace)
+            .diagnosticsParams(uri: uri, text: text)
+        notify(method: "textDocument/publishDiagnostics", params: params)
     }
 
     private func documentPosition(from message: [String: Any]) -> (String, Int, Int)? {
@@ -115,13 +106,6 @@ final class StdioLanguageServer {
             return nil
         }
         return (uri, line, character)
-    }
-
-    private func lspRange(_ range: SourceRange) -> [String: Any] {
-        [
-            "start": ["line": range.start.line, "character": range.start.character],
-            "end": ["line": range.end.line, "character": range.end.character]
-        ]
     }
 
     private func respond(id: Any?, result: Any) {

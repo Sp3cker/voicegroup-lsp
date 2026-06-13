@@ -1,15 +1,13 @@
 import Foundation
-import VoicegroupCore
 
-public struct CompletionItem: Equatable, Sendable {
+public struct VoicegroupCompletionItem: Equatable, Sendable {
     public var label: String
     public var detail: String
 }
 
-/// This is the testable editor-intelligence facade. The JSON-RPC server is
-/// deliberately thin so parser/completion/hover behavior can be tested without
-/// having to spin up VS Code or speak LSP framing in unit tests.
-public struct LanguageService: Sendable {
+/// Transport-neutral editor intelligence over voicegroup source.
+public struct VoicegroupLanguageService: Sendable {
+    //TODO: does this need to be var?
     public var workspace: WorkspaceIndex
     private let parser = VoicegroupParser()
 
@@ -23,7 +21,7 @@ public struct LanguageService: Sendable {
             .diagnostics(for: document)
     }
 
-    public func completions(text: String, line: Int, character: Int) -> [CompletionItem] {
+    public func completions(text: String, line: Int, character: Int) -> [VoicegroupCompletionItem] {
         let lineText = text.line(at: line)
         let prefix = String(lineText.prefix(min(character, lineText.count)))
         if prefix.trimmingCharacters(in: .whitespaces).hasPrefix("voice_") || prefix.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -82,4 +80,3 @@ private extension String {
         return lines[index]
     }
 }
-
