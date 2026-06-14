@@ -10,6 +10,23 @@ import Foundation
     #expect(completions.contains { $0.label == "voice_directsound_no_resample" })
 }
 
+@Test func languageServiceCompletesDirectSoundSymbolsInArgumentContext() throws {
+    let symbol = IndexedSymbol(
+        name: "DirectSoundWaveData_piano",
+        uri: "file:///sound/direct_sound_data.inc",
+        range: .init(start: .init(line: 0, character: 0), end: .init(line: 0, character: 25)),
+        targetPath: "sound/direct_sound_samples/piano.bin"
+    )
+    let service = VoicegroupLanguageService(
+        workspace: WorkspaceIndex(symbols: .init(directSound: [symbol.name: symbol]))
+    )
+    let text = "\tvoice_directsound 60, 0, DirectSoundWaveData_p"
+    let completions = service.completions(text: text, line: 0, character: text.count)
+
+    #expect(completions.contains { $0.label == "DirectSoundWaveData_piano" })
+    #expect(!completions.contains { $0.label == "voice_directsound" })
+}
+
 @Test func languageServiceReturnsHoverForMacroArguments() throws {
     let service = VoicegroupLanguageService(workspace: WorkspaceIndex())
     let hover = service.hover(

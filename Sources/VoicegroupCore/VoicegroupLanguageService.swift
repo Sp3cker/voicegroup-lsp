@@ -7,8 +7,7 @@ public struct VoicegroupCompletionItem: Equatable, Sendable {
 
 /// Transport-neutral editor intelligence over voicegroup source.
 public struct VoicegroupLanguageService: Sendable {
-    //TODO: does this need to be var?
-    public var workspace: WorkspaceIndex
+    public let workspace: WorkspaceIndex
     private let parser = VoicegroupParser()
 
     public init(workspace: WorkspaceIndex) {
@@ -24,28 +23,30 @@ public struct VoicegroupLanguageService: Sendable {
     public func completions(text: String, line: Int, character: Int) -> [VoicegroupCompletionItem] {
         let lineText = text.line(at: line)
         let prefix = String(lineText.prefix(min(character, lineText.count)))
-        if prefix.trimmingCharacters(in: .whitespaces).hasPrefix("voice_") || prefix.trimmingCharacters(in: .whitespaces).isEmpty {
+        let trimmedPrefix = prefix.trimmingCharacters(in: .whitespaces)
+
+        if let context = argumentContext(text: text, line: line, character: character),
+           let macro = MacroCatalog.byName[context.macroName],
+           macro.arguments.indices.contains(context.argumentIndex) {
+            switch macro.arguments[context.argumentIndex].kind {
+            case .directSoundSymbol:
+                return workspace.symbols.directSound.keys.sorted().map { .init(label: $0, detail: "DirectSound sample") }
+            case .programmableWaveSymbol:
+                return workspace.symbols.programmableWave.keys.sorted().map { .init(label: $0, detail: "Programmable wave") }
+            case .keysplitSymbol:
+                return workspace.keysplits.definitions.keys.sorted().map { .init(label: $0, detail: "Keysplit table") }
+            case .voicegroupSymbol:
+                return workspace.voicegroups.keys.sorted().map { .init(label: "voicegroup_\($0)", detail: "Voicegroup") }
+            case .integer:
+                return []
+            }
+        }
+
+        if trimmedPrefix.hasPrefix("voice_") || trimmedPrefix.isEmpty {
             return MacroCatalog.definitions.map { .init(label: $0.name, detail: $0.summary) }
         }
 
-        guard let context = argumentContext(text: text, line: line, character: character),
-              let macro = MacroCatalog.byName[context.macroName],
-              macro.arguments.indices.contains(context.argumentIndex) else {
-            return []
-        }
-
-        switch macro.arguments[context.argumentIndex].kind {
-        case .directSoundSymbol:
-            return workspace.symbols.directSound.keys.sorted().map { .init(label: $0, detail: "DirectSound sample") }
-        case .programmableWaveSymbol:
-            return workspace.symbols.programmableWave.keys.sorted().map { .init(label: $0, detail: "Programmable wave") }
-        case .keysplitSymbol:
-            return workspace.keysplits.definitions.keys.sorted().map { .init(label: $0, detail: "Keysplit table") }
-        case .voicegroupSymbol:
-            return workspace.voicegroups.keys.sorted().map { .init(label: "voicegroup_\($0)", detail: "Voicegroup") }
-        case .integer:
-            return []
-        }
+        return []
     }
 
     public func hover(text: String, line: Int, character: Int) -> String? {
