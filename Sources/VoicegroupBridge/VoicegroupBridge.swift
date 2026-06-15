@@ -4,6 +4,11 @@ import VoicegroupCore
 public typealias VoicegroupBridgeCompletionCallback = @convention(c) (
     UnsafePointer<CChar>?,
     UnsafePointer<CChar>?,
+    UnsafePointer<CChar>?,
+    Int32,
+    Int32,
+    Int32,
+    Int32,
     UnsafeMutableRawPointer?
 ) -> Void
 
@@ -45,6 +50,17 @@ private final class VoicegroupBridgeService {
     func hover(line: Int, character: Int) -> String? {
         guard let text = documentText else { return nil }
         return languageService.hover(text: text, line: line, character: character)
+    }
+
+    func tabAction(startLine: Int, startCharacter: Int, endLine: Int, endCharacter: Int) -> VoicegroupTabAction? {
+        guard let text = documentText else { return nil }
+        return languageService.tabAction(
+            text: text,
+            startLine: startLine,
+            startCharacter: startCharacter,
+            endLine: endLine,
+            endCharacter: endCharacter
+        )
     }
 
     private static func loadWorkspace(projectRoot: String) -> WorkspaceIndex? {
@@ -105,10 +121,57 @@ public func textedit_voicegroup_service_complete(
     for completion in completions {
         completion.label.withCString { label in
             completion.detail.withCString { detail in
-                callback(label, detail, userData)
+                completion.insertText.withCString { insertText in
+                    callback(
+                        label,
+                        detail,
+                        insertText,
+                        Int32(completion.replacementStartLine),
+                        Int32(completion.replacementStartCharacter),
+                        Int32(completion.replacementEndLine),
+                        Int32(completion.replacementEndCharacter),
+                        userData
+                    )
+                }
             }
         }
     }
+    return 1
+}
+
+@_cdecl("textedit_voicegroup_service_tab_action")
+public func textedit_voicegroup_service_tab_action(
+    _ service: UnsafeMutableRawPointer?,
+    _ startLine: Int32,
+    _ startCharacter: Int32,
+    _ endLine: Int32,
+    _ endCharacter: Int32,
+    _ outActionKind: UnsafeMutablePointer<Int32>?,
+    _ outStartLine: UnsafeMutablePointer<Int32>?,
+    _ outStartCharacter: UnsafeMutablePointer<Int32>?,
+    _ outEndLine: UnsafeMutablePointer<Int32>?,
+    _ outEndCharacter: UnsafeMutablePointer<Int32>?
+) -> Int32 {
+    guard let service = bridgeService(from: service),
+          let outActionKind,
+          let outStartLine,
+          let outStartCharacter,
+          let outEndLine,
+          let outEndCharacter,
+          let action = service.tabAction(
+              startLine: Int(startLine),
+              startCharacter: Int(startCharacter),
+              endLine: Int(endLine),
+              endCharacter: Int(endCharacter)
+          ) else {
+        return 0
+    }
+
+    outActionKind.pointee = action.kind.rawValue
+    outStartLine.pointee = Int32(action.startLine)
+    outStartCharacter.pointee = Int32(action.startCharacter)
+    outEndLine.pointee = Int32(action.endLine)
+    outEndCharacter.pointee = Int32(action.endCharacter)
     return 1
 }
 

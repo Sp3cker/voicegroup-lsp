@@ -132,19 +132,13 @@ public struct VoicegroupParser: Sendable {
         var args: [VoiceArgument] = []
         var current = ""
         var argStart = 0
-        var seenNonSpace = false
 
         for (offset, character) in text.enumerated() {
             if character == "," {
                 appendArg(current, argStart: argStart, endOffset: offset, line: line, startColumn: startColumn, into: &args)
                 current = ""
                 argStart = offset + 1
-                seenNonSpace = false
             } else {
-                if !seenNonSpace && !character.isWhitespace {
-                    argStart = offset
-                    seenNonSpace = true
-                }
                 current.append(character)
             }
         }

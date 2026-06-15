@@ -27,6 +27,51 @@ import Foundation
     #expect(!completions.contains { $0.label == "voice_directsound" })
 }
 
+@Test func languageServiceNarrowsDirectSoundSymbolsByTypedPrefix() throws {
+    let piano = IndexedSymbol(
+        name: "DirectSoundWaveData_piano",
+        uri: "file:///sound/direct_sound_data.inc",
+        range: .init(start: .init(line: 0, character: 0), end: .init(line: 0, character: 25)),
+        targetPath: "sound/direct_sound_samples/piano.bin"
+    )
+    let bass = IndexedSymbol(
+        name: "DirectSoundWaveData_bass",
+        uri: "file:///sound/direct_sound_data.inc",
+        range: .init(start: .init(line: 2, character: 0), end: .init(line: 2, character: 24)),
+        targetPath: "sound/direct_sound_samples/bass.bin"
+    )
+    let service = VoicegroupLanguageService(
+        workspace: WorkspaceIndex(symbols: .init(directSound: [piano.name: piano, bass.name: bass]))
+    )
+    let text = "\tvoice_directsound 60, 0, DirectSoundWaveData_p"
+    let completions = service.completions(text: text, line: 0, character: text.count)
+
+    #expect(completions.map(\.label) == ["DirectSoundWaveData_piano"])
+}
+
+@Test func languageServiceDoesNotRecommendCrySamplesForDirectSoundVoices() throws {
+    let directSound = IndexedSymbol(
+        name: "DirectSoundWaveData_piano",
+        uri: "file:///sound/direct_sound_data.inc",
+        range: .init(start: .init(line: 0, character: 0), end: .init(line: 0, character: 25)),
+        targetPath: "sound/direct_sound_samples/piano.bin"
+    )
+    let cry = IndexedSymbol(
+        name: "Cry_MissingNo",
+        uri: "file:///sound/direct_sound_data.inc",
+        range: .init(start: .init(line: 2, character: 0), end: .init(line: 2, character: 13)),
+        targetPath: "sound/direct_sound_samples/cries/missingno.bin"
+    )
+    let service = VoicegroupLanguageService(
+        workspace: WorkspaceIndex(symbols: .init(directSound: [directSound.name: directSound, cry.name: cry]))
+    )
+    let text = "\tvoice_directsound 60, 0, "
+    let completions = service.completions(text: text, line: 0, character: text.count)
+
+    #expect(completions.contains { $0.label == "DirectSoundWaveData_piano" })
+    #expect(!completions.contains { $0.label == "Cry_MissingNo" })
+}
+
 @Test func languageServiceReturnsHoverForMacroArguments() throws {
     let service = VoicegroupLanguageService(workspace: WorkspaceIndex())
     let hover = service.hover(
@@ -48,7 +93,7 @@ import Foundation
     #expect(MacroCatalog.byName["cry"]?.arguments.map(\.kind) == [.directSoundSymbol])
 }
 
-@Test func parserBuildsSlotsAndKeepsArgumentRanges() throws {
+@Test func parserBuildsVoiceMacroSlots() throws {
     let text = """
     voice_group route101
     \tvoice_keysplit_all voicegroup_rs_drumset
@@ -64,6 +109,24 @@ import Foundation
     #expect(document.calls[1].slot == 1)
     #expect(document.calls[1].arguments[2].text == "DirectSoundWaveData_sc88pro_piano1")
     #expect(document.calls[2].macroName == "voice_square_1")
+}
+
+@Test func parserKeepsArgumentRangesForMacroCalls() throws {
+    let text = "\tvoice_square_1 60, 0, 0, 2, 0, 0, 15, 0"
+    let document = VoicegroupParser().parse(text, uri: "file:///sound/voicegroups/route101.inc")
+    let call = try #require(document.calls.first)
+
+    let expectedPanRange = SourceRange(
+        start: SourcePosition(line: 0, character: 20),
+        end: SourcePosition(line: 0, character: 21)
+    )
+    let expectedSweepRange = SourceRange(
+        start: SourcePosition(line: 0, character: 23),
+        end: SourcePosition(line: 0, character: 24)
+    )
+
+    #expect(call.arguments[1].range == expectedPanRange)
+    #expect(call.arguments[2].range == expectedSweepRange)
 }
 
 @Test func parserHonorsVoiceGroupStartingNote() throws {
