@@ -21,7 +21,6 @@ public struct NumericRange: Equatable, Sendable {
         value >= min && value <= max
     }
 }
-
 public struct MacroArgument: Equatable, Sendable {
     public var name: String
     public var kind: ArgumentKind
@@ -35,7 +34,28 @@ public struct MacroArgument: Equatable, Sendable {
         self.help = help
     }
 }
-
+let BaseKeyArg: MacroArgument = .init(
+    "base_midi_key", .integer, range: .init(0, 127),
+    help: "Root MIDI note used when pitching the DirectSound sample.")
+let PanArg: MacroArgument = .init(
+    "pan", .integer, range: .init(0, 127),
+    help:
+        "m4a pan value. Zero means centered/disabled in the emitted macro. Squares accept 0, 64, 127 enumerated."
+)
+let SqDutyCycleArg: MacroArgument = .init(
+    "duty_cycle", .integer, range: .init(0, 3),
+    help: "Hardware duty cycle masked to two bits by the assembler macro.")
+let SqAttackArg: MacroArgument = .init(
+    "attack", .integer, range: .init(0, 7), help: "3-bit hardware envelope attack.")
+let SqDecayArg: MacroArgument = .init(
+    "decay", .integer, range: .init(0, 7), help: "3-bit hardware envelope decay.")
+let SqSustainArg: MacroArgument = .init(
+    "sustain", .integer, range: .init(0, 15),
+    help: "4-bit hardware envelope sustain.")
+let SqReleaseArg: MacroArgument = .init(
+    "release", .integer, range: .init(0, 7),
+    help: "3-bit hardware envelope release.")
+let SqEnvelopeArgs = [SqAttackArg, SqDecayArg, SqSustainArg, SqReleaseArg]
 public struct VoiceMacroDefinition: Equatable, Sendable {
     public var name: String
     public var arguments: [MacroArgument]
@@ -54,7 +74,8 @@ public struct VoiceMacroDefinition: Equatable, Sendable {
 public enum MacroCatalog {
     public static let definitions: [VoiceMacroDefinition] = [
         directSound("voice_directsound_no_resample", "DirectSound sample without m4a resampling."),
-        directSound("voice_directsound_alt", "DirectSound sample using the alternate fixed voice type."),
+        directSound(
+            "voice_directsound_alt", "DirectSound sample using the alternate fixed voice type."),
         directSound("voice_directsound", "DirectSound sample voice."),
         square1("voice_square_1_alt", "Square channel 1 alternate hardware voice."),
         square1("voice_square_1", "Square channel 1 hardware voice."),
@@ -66,99 +87,122 @@ public enum MacroCatalog {
         noise("voice_noise", "Noise channel hardware voice."),
         VoiceMacroDefinition(
             name: "voice_keysplit_all",
-            arguments: [.init("voice_group_pointer", .voicegroupSymbol, help: "Sub-voicegroup used for all notes.")],
+            arguments: [
+                .init(
+                    "voice_group_pointer", .voicegroupSymbol,
+                    help: "Sub-voicegroup used for all notes.")
+            ],
             summary: "Routes all notes into a sub-voicegroup, commonly a drumset."
         ),
         VoiceMacroDefinition(
             name: "voice_keysplit",
             arguments: [
-                .init("voice_group_pointer", .voicegroupSymbol, help: "Sub-voicegroup selected by the keysplit table."),
-                .init("keysplit_table_pointer", .keysplitSymbol, help: "Keysplit table that maps notes to sub-voice slots.")
+                .init(
+                    "voice_group_pointer", .voicegroupSymbol,
+                    help: "Sub-voicegroup selected by the keysplit table."),
+                .init(
+                    "keysplit_table_pointer", .keysplitSymbol,
+                    help: "Keysplit table that maps notes to sub-voice slots."),
             ],
             summary: "Routes notes to slots in another voicegroup through a keysplit table."
         ),
         VoiceMacroDefinition(
             name: "cry_reverse",
-            arguments: [.init("sample", .directSoundSymbol, help: "Cry sample symbol from direct sound data.")],
+            arguments: [
+                .init(
+                    "sample", .directSoundSymbol, help: "Cry sample symbol from direct sound data.")
+            ],
             summary: "Reverse cry sample voice."
         ),
         VoiceMacroDefinition(
             name: "cry",
-            arguments: [.init("sample", .directSoundSymbol, help: "Cry sample symbol from direct sound data.")],
+            arguments: [
+                .init(
+                    "sample", .directSoundSymbol, help: "Cry sample symbol from direct sound data.")
+            ],
             summary: "Cry sample voice."
-        )
+        ),
     ]
 
     public static let byName = Dictionary(uniqueKeysWithValues: definitions.map { ($0.name, $0) })
 
-    public static func argumentHover(for macro: VoiceMacroDefinition, argumentIndex: Int?) -> String {
+    public static func argumentHover(for macro: VoiceMacroDefinition, argumentIndex: Int?) -> String
+    {
         if let argumentIndex, macro.arguments.indices.contains(argumentIndex) {
             let argument = macro.arguments[argumentIndex]
-            return "\(macro.name) argument \(argumentIndex + 1): \(argument.name)\n\n\(argument.help)"
+            return
+                "\(macro.name) argument \(argumentIndex + 1): \(argument.name)\n\n\(argument.help)"
         }
         let signature = macro.arguments.map(\.name).joined(separator: ", ")
         return "\(macro.name) \(signature)\n\n\(macro.summary)"
     }
 
     private static func directSound(_ name: String, _ summary: String) -> VoiceMacroDefinition {
-        VoiceMacroDefinition(name: name, arguments: [
-            .init("base_midi_key", .integer, range: .init(0, 127), help: "Root MIDI note used when pitching the DirectSound sample."),
-            .init("pan", .integer, range: .init(0, 127), help: "m4a pan value. Zero means centered/disabled in the emitted macro."),
-            .init("sample_data_pointer", .directSoundSymbol, help: "DirectSoundWaveData_* symbol resolved through direct_sound_data.inc."),
-            .init("attack", .integer, range: .init(0, 255), help: "Envelope attack byte."),
-            .init("decay", .integer, range: .init(0, 255), help: "Envelope decay byte."),
-            .init("sustain", .integer, range: .init(0, 255), help: "Envelope sustain byte."),
-            .init("release", .integer, range: .init(0, 255), help: "Envelope release byte.")
-        ], summary: summary)
+        VoiceMacroDefinition(
+            name: name,
+            arguments: [
+                BaseKeyArg,
+                PanArg,
+                .init(
+                    "sample_data_pointer", .directSoundSymbol,
+                    help: "DirectSoundWaveData_* symbol resolved through direct_sound_data.inc."),
+                .init("attack", .integer, range: .init(0, 255), help: "Envelope attack byte."),
+                .init("decay", .integer, range: .init(0, 255), help: "Envelope decay byte."),
+                .init("sustain", .integer, range: .init(0, 255), help: "Envelope sustain byte."),
+                .init("release", .integer, range: .init(0, 255), help: "Envelope release byte."),
+            ], summary: summary)
     }
 
     private static func square1(_ name: String, _ summary: String) -> VoiceMacroDefinition {
-        VoiceMacroDefinition(name: name, arguments: [
-            .init("base_midi_key", .integer, range: .init(0, 127), help: "Root MIDI note for the hardware square voice."),
-            .init("pan", .integer, range: .init(0, 127), help: "Accepted for macro compatibility; poryaaaa runtime ignores it for square voices."),
-            .init("sweep", .integer, range: .init(0, 255), help: "Square 1 sweep byte."),
-            .init("duty_cycle", .integer, range: .init(0, 3), help: "Hardware duty cycle masked to two bits by the assembler macro."),
-            .init("attack", .integer, range: .init(0, 7), help: "3-bit hardware envelope attack."),
-            .init("decay", .integer, range: .init(0, 7), help: "3-bit hardware envelope decay."),
-            .init("sustain", .integer, range: .init(0, 15), help: "4-bit hardware envelope sustain."),
-            .init("release", .integer, range: .init(0, 7), help: "3-bit hardware envelope release.")
-        ], summary: summary)
+        VoiceMacroDefinition(
+            name: name,
+            arguments: [
+                BaseKeyArg,
+                PanArg,
+                .init("sweep", .integer, range: .init(0, 255), help: "Square 1 sweep byte."),
+                SqDutyCycleArg,
+            ] + SqEnvelopeArgs, summary: summary)
     }
 
     private static func square2(_ name: String, _ summary: String) -> VoiceMacroDefinition {
-        VoiceMacroDefinition(name: name, arguments: [
-            .init("base_midi_key", .integer, range: .init(0, 127), help: "Root MIDI note for the hardware square voice."),
-            .init("pan", .integer, range: .init(0, 127), help: "Accepted for macro compatibility; poryaaaa runtime ignores it for square voices."),
-            .init("duty_cycle", .integer, range: .init(0, 3), help: "Hardware duty cycle masked to two bits by the assembler macro."),
-            .init("attack", .integer, range: .init(0, 7), help: "3-bit hardware envelope attack."),
-            .init("decay", .integer, range: .init(0, 7), help: "3-bit hardware envelope decay."),
-            .init("sustain", .integer, range: .init(0, 15), help: "4-bit hardware envelope sustain."),
-            .init("release", .integer, range: .init(0, 7), help: "3-bit hardware envelope release.")
-        ], summary: summary)
+        VoiceMacroDefinition(
+            name: name,
+            arguments: [
+                BaseKeyArg,
+                PanArg,
+                SqDutyCycleArg,
+            ] + SqEnvelopeArgs, summary: summary)
     }
 
     private static func progWave(_ name: String, _ summary: String) -> VoiceMacroDefinition {
-        VoiceMacroDefinition(name: name, arguments: [
-            .init("base_midi_key", .integer, range: .init(0, 127), help: "Root MIDI note for the programmable wave."),
-            .init("pan", .integer, range: .init(0, 127), help: "m4a pan value. Zero means centered/disabled in the emitted macro."),
-            .init("wave_samples_pointer", .programmableWaveSymbol, help: "ProgrammableWaveData_* symbol resolved through programmable_wave_data.inc."),
-            .init("attack", .integer, range: .init(0, 7), help: "3-bit hardware envelope attack."),
-            .init("decay", .integer, range: .init(0, 7), help: "3-bit hardware envelope decay."),
-            .init("sustain", .integer, range: .init(0, 15), help: "4-bit hardware envelope sustain."),
-            .init("release", .integer, range: .init(0, 7), help: "3-bit hardware envelope release.")
-        ], summary: summary)
+        VoiceMacroDefinition(
+            name: name,
+            arguments: [
+                BaseKeyArg,
+                PanArg,
+                .init(
+                    "wave_samples_pointer", .programmableWaveSymbol,
+                    help:
+                        "ProgrammableWaveData_* symbol resolved through programmable_wave_data.inc."
+                ),
+            ] + SqEnvelopeArgs, summary: summary)
     }
 
     private static func noise(_ name: String, _ summary: String) -> VoiceMacroDefinition {
-        VoiceMacroDefinition(name: name, arguments: [
-            .init("base_midi_key", .integer, range: .init(0, 127), help: "Root MIDI note for the noise voice."),
-            .init("pan", .integer, range: .init(0, 127), help: "Accepted for macro compatibility; poryaaaa runtime ignores it for noise voices."),
-            .init("period", .integer, range: .init(0, 1), help: "Noise period bit. The assembler macro masks this to one bit."),
-            .init("attack", .integer, range: .init(0, 7), help: "3-bit hardware envelope attack."),
-            .init("decay", .integer, range: .init(0, 7), help: "3-bit hardware envelope decay."),
-            .init("sustain", .integer, range: .init(0, 15), help: "4-bit hardware envelope sustain."),
-            .init("release", .integer, range: .init(0, 7), help: "3-bit hardware envelope release.")
-        ], summary: summary)
+        VoiceMacroDefinition(
+            name: name,
+            arguments: [
+                .init(
+                    "base_midi_key", .integer, range: .init(0, 127),
+                    help: "Root MIDI note for the noise voice."),
+                .init(
+                    "pan", .integer, range: .init(0, 127),
+                    help:
+                        "Accepted for macro compatibility; poryaaaa runtime ignores it for noise voices."
+                ),
+                .init(
+                    "period", .integer, range: .init(0, 1),
+                    help: "Noise period bit. The assembler macro masks this to one bit."),
+            ] + SqEnvelopeArgs, summary: summary)
     }
 }
-
